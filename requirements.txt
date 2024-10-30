@@ -1,2 +1,4 @@
 ultralytics
+deepface
+tf-keras
 opencv-python

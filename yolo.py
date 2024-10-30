@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import cv2
 import math 
 # start webcam
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 cap.set(3, 640)
 cap.set(4, 480)
 
@@ -36,20 +36,21 @@ while True:
         boxes = r.boxes
 
         for box in boxes:
-            # bounding box
-            x1, y1, x2, y2 = box.xyxy[0]
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2) # convert to int values
-
-            # put box in cam
-            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 3)
-
-            # confidence
-            confidence = math.ceil((box.conf[0]*100))/100
-            print("Confidence --->",confidence)
+           
 
             # class name
             cls = int(box.cls[0])
             if classNames[cls] == "person":
+                 # bounding box
+                x1, y1, x2, y2 = box.xyxy[0]
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2) # convert to int values
+
+                # put box in cam
+                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 3)
+
+                # confidence
+                confidence = math.ceil((box.conf[0]*100))/100
+                print("Confidence --->",confidence)
                 print("Class name -->", classNames[cls])
 
                 # object details

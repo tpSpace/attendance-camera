@@ -21,7 +21,7 @@ def realtime_face_recognition():
      
         
         # Perform face recognition on the captured frame
-        people = DeepFace.find(img_path=frame, db_path="db/", model_name=model_name, distance_metric=metrics[0], enforce_detection=False)
+        people = DeepFace.find(img_path=frame, db_path="db/", model_name=model_name, distance_metric=metrics[2], enforce_detection=False)
 
         for person in people:
             # Check if the coordinates of the face bounding box exist and have at least one element
@@ -40,7 +40,7 @@ def realtime_face_recognition():
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
                 
                 # Get the person's name and display it on the image
-                name = person['identity'].split('/')[-1].split('.')[0]
+                name = person['identity'][0].split('/')[1]
                 cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
             else:
                 continue

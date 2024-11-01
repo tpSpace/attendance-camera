@@ -1,5 +1,6 @@
 from deepface import DeepFace
 import cv2
+import numpy as np
 
 # List of available backends, models, and distance metrics
 backends = ["opencv", "ssd", "dlib", "mtcnn", "retinaface"]
@@ -7,6 +8,9 @@ models = ["VGG-Face", "Facenet", "Facenet512", "OpenFace", "DeepFace", "DeepID",
 metrics = ["cosine", "euclidean", "euclidean_l2"]
 
 def realtime_face_recognition():
+    model_name = models[0]
+    model = DeepFace.build_model(model_name)
+    
     # Define a video capture object
     vid = cv2.VideoCapture(0)
 
@@ -14,9 +18,10 @@ def realtime_face_recognition():
         # Capture the video frame by frame
         ret, frame = vid.read()
 
+     
+        
         # Perform face recognition on the captured frame
-        # Find faces and identify people using a specific model and distance metric
-        people = DeepFace.find(img_path=frame, db_path="db/", model_name=models[0], distance_metric=metrics[0], enforce_detection=False)
+        people = DeepFace.find(img_path=frame, db_path="db/", model_name=model_name, distance_metric=metrics[0], enforce_detection=False)
 
         for person in people:
             # Check if the coordinates of the face bounding box exist and have at least one element
@@ -31,15 +36,15 @@ def realtime_face_recognition():
                 w = person['source_w'][0]
                 h = person['source_h'][0]
 
-                 # Draw a rectangle around the face
+                # Draw a rectangle around the face
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                 # Get the person's name and display it on the image
-                name = person['identity'][0].split('/')[1]
-                cv2.putText(frame, name, (x, y), cv2.FONT_ITALIC, 1, (0, 0, 255), 2)
+                
+                # Get the person's name and display it on the image
+                name = person['identity'].split('/')[-1].split('.')[0]
+                cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
             else:
                 continue
-            # Display the resulting frame
-       
+
         # Display the resulting frame
         cv2.imshow('frame', frame)
 

@@ -47,3 +47,7 @@ Follow these steps to set up your project:
     ```bash
     deactivate
     ```
+
+## Dataset
+
+https://www.kaggle.com/datasets/atulanandjha/lfwpeople

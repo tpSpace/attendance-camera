@@ -1,6 +1,5 @@
 from deepface import DeepFace
 import cv2
-import numpy as np
 
 # List of available backends, models, and distance metrics
 backends = ["opencv", "ssd", "dlib", "mtcnn", "retinaface"]

@@ -1,0 +1,2 @@
+[tool.ruff]
+python.executable = "./venv/bin/python"

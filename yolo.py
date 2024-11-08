@@ -315,7 +315,7 @@ class FaceRegister:
                 # Crop and save the face image
                 face_img = img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]]
                 now = time.time()
-                timestamp = int(now * 1000)  # Convert time to milliseconds for better precision
+                timestamp = int(now * 1000)
                 filename = f"{name}_{timestamp}.jpg"
                 cv2.imwrite(filename=filename, img=face_img)
                 count += 1

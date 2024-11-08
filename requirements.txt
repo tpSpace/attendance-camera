@@ -3,3 +3,4 @@ deepface
 tf-keras
 opencv-python
 dlib
+face_recognition

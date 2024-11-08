@@ -10,6 +10,7 @@ from torchvision import models
 from PIL import Image
 from ultralytics import YOLO
 from utils import Ok, Result, Err
+import dlib 
 
 class Person:
     def __init__(self, name: str, embedding: np.ndarray):
@@ -188,6 +189,35 @@ class FaceRecognitionApp:
         """
         self.cap.release()
         cv2.destroyAllWindows()
+
+def dlib():
+    def __init__(self, face_detector: FaceDetector, face_recognizer: FaceRecognizer):
+        """
+        Initializes the Face Recognition application with face detector and recognizer.
+        """
+        self.face_detector = face_detector
+        self.face_recognizer = face_recognizer
+        self.cap = cv2.VideoCapture(0)
+        self.cap.set(3, 640)
+        self.cap.set(4, 480)
+    def run(self) -> Result[None]:
+        print("Running the face recognition app...")
+        while True:
+            success, img = self.cap.read()
+            if not success:
+                return Err("Could not read frame")
+            _, err = self._process_frame(img)
+            if err:
+                return Err(err)
+            
+            # use dlib to compare faces with the known faces in db
+            
+
+            if cv2.waitKey(1) == ord('q'):
+                print("Quitting...")
+                break
+
+
 
 class FaceRegister:
     def __init__(self, face_detector: 'FaceDetector', save_dir: str, n: int = 5):

@@ -1,27 +1,17 @@
 from ultralytics import YOLO
 import cv2
-import math 
-# start webcam
+import math
+
+# Start webcam
 cap = cv2.VideoCapture(0)
 cap.set(3, 640)
 cap.set(4, 480)
 
-# model
-# model = YOLO("yolo-Weights/yolov8n.pt")
-model = YOLO("yolo-Weights/yolo11n.pt")
+# Load model
+model = YOLO("yolo-Weights/yolo11-face-custom.pt")  # Load your custom face detection model
 
-# object classes
-classNames = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat",
-              "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",
-              "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella",
-              "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat",
-              "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup",
-              "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli",
-              "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed",
-              "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone",
-              "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors",
-              "teddy bear", "hair drier", "toothbrush"
-              ]
+# Object classes
+classNames = ["face"]
 
 if not cap.isOpened():
     print("Error: Could not open camera.")
@@ -29,40 +19,32 @@ if not cap.isOpened():
 
 while True:
     success, img = cap.read()
-    results = model(img, stream=True)
+    if not success:
+        break
 
-    # coordinates
+    results = model(img)
+
     for r in results:
         boxes = r.boxes
 
         for box in boxes:
-            # class name
+            # Class index
             cls = int(box.cls[0])
-            if classNames[cls] == "person":
-                # confidence
-                confidence = math.ceil((box.conf[0]*100))/100
-                if confidence < 0.5:
+            # Check if detected class is "face"
+            if classNames[cls] == "face":
+                if box.conf[0] < 0.5:
                     continue
-                 # bounding box
+                # Confidence
+                confidence = math.ceil((box.conf[0] * 100)) / 100
+                # Bounding box coordinates
                 x1, y1, x2, y2 = box.xyxy[0]
-                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2-y2/3) # convert to int values # reduce the height of the box
-
-                # put box in cam
-                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 3)
-
-                
-
-                print("Confidence --->",confidence)
-                print("Class name -->", classNames[cls])
-
-                # object details
-                org = [x1, y1]
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                fontScale = 1
-                color = (255, 0, 0)
-                thickness = 2
-
-                cv2.putText(img, classNames[cls], org, font, fontScale, color, thickness)
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                # Draw rectangle around face
+                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 2)
+                # Display class name and confidence
+                label = f"{classNames[cls]} {confidence}"
+                cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.9, (255, 0, 255), 2)
 
     cv2.imshow('Webcam', img)
     if cv2.waitKey(1) == ord('q'):

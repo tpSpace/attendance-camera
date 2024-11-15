@@ -3,10 +3,10 @@ env/
 
 venv/
 __pycache__/
-
+*.png
 *.log
 *.env
-
+*.jpg
 /db/*.pkl
 *.pkl
 *.csv

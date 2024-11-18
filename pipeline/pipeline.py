@@ -58,17 +58,16 @@ class Pipeline:
             boxes = self.detector.detect_faces(frame)
             for box in boxes:
                 if box is not None:
-                    landmark = self.aligner.get_landmarks_from_image(image=frame, detected_face=box)
-                    face = box.crop(image=frame)
-                    face = cv2.resize(face, self.STANDARD_DIMENSION)
-                    aligned = self.aligner.align(landmark=landmark, face=face)
+                    # Extract face region
+                    x1, y1, x2, y2, _ = box
+                    face = frame[y1:y2, x1:x2]
                     
-                    # Convert aligned face to tensor
-                    aligned_rgb = cv2.cvtColor(aligned, cv2.COLOR_BGR2RGB)
-                    img = Image.fromarray(aligned_rgb)
+                    # Convert to RGB and PIL Image
+                    face_rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+                    img = Image.fromarray(face_rgb)
                     face_tensor = self.preprocess_image(img)
                     
-                    # Get embedding of the aligned face
+                    # Get embedding of the face
                     with torch.no_grad():
                         embedding = self.embedding_model(face_tensor.unsqueeze(0))
                     
@@ -80,21 +79,22 @@ class Pipeline:
                     if similarities:
                         best_match_index = np.argmax(similarities)
                         best_similarity = similarities[best_match_index]
-                        threshold = 0.8  # Adjust threshold as needed
+                        threshold = 0.7  # Adjust threshold as needed
                         if best_similarity > threshold:
                             name = self.embeddings_db['names'][best_match_index]
                         else:
                             name = "Unknown"
                         # Draw the name and similarity on the frame
-                        x1, y1, x2, y2, _ = box
                         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        cv2.putText(frame, f"{name} ({best_similarity:.2f})", (x1, y1 - 10),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                    cv2.imshow("Aligned", aligned)
+                        cv2.putText(frame, f"{name} ({best_similarity:.2f})", 
+                                (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+                                0.9, (0, 255, 0), 2)
+                    
             cv2.imshow("Face Recognition", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 logging.info("Exiting camera stream.")
                 break
+        
         cap.release()
         cv2.destroyAllWindows()
         logging.info("Camera stream session closed!")

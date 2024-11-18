@@ -35,12 +35,9 @@ class Pipeline:
             for box in boxes:
                 if box is not None:
                     person = Person()
-                    landmark = self.aligner.get_landmarks_from_image(image=frame, detected_face=box)
-                    person.set_landmark(landmark)
+                    self.aligner.preprocess(image=frame, box=box)
+                    aligned = self.aligner.align()
                     people.append(person)
-                    face =  box.crop(image=frame)
-                    face = cv2.resize(face, self.STANDARD_DIMENSION)
-                    aligned = self.aligner.align(landmark=person.landmark, face=face)
                     cv2.imshow("Aligned", aligned)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         logging.info("Exiting camera stream.")

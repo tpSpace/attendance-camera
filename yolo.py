@@ -4,8 +4,9 @@ import numpy as np
 from ultralytics import YOLO
 import os
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 # Initialize YOLO model for fast detection
-yolo_model = YOLO("yolo-Weights/yolo11-face-custom.pt")
+yolo_model = YOLO("pretrain/yolo11-face-custom.pt")
 
 # Load known faces
 known_faces = []
@@ -68,25 +69,34 @@ while True:
         for face_encoding, face_location in zip(face_encodings, face_locations):
             # Compare with known faces
             matches = face_recognition.compare_faces(known_faces, face_encoding, tolerance=0.6)
-            face_distances = face_recognition.face_distance(known_faces, face_encoding)
-            
-            # Find the best match
-            best_match_index = np.argmin(face_distances)
-            name = "Unknown"
-            
-            if matches[best_match_index]:
+            # face_distances = face_recognition.face_distance(known_faces, face_encoding)
+            # Compute cosine similarities
+            cosine_similarities = cosine_similarity([face_encoding], known_faces)[0]
+
+            # Find the index of the best match
+            best_match_index = np.argmax(cosine_similarities)
+
+            # Set a threshold for cosine similarity
+            threshold = 0.9  # Adjust this value based on your requirements
+
+            # Get the best similarity score
+            best_similarity = cosine_similarities[best_match_index]
+
+            if best_similarity > threshold:
                 name = known_names[best_match_index]
-                confidence = 1 - face_distances[best_match_index]
-                if confidence < 0.4:
-                    name = "Unknown"
+            else:
+                name = "Unknown"
+
+            # Set confidence as the best similarity score
+            confidence = best_similarity
         
-                # Draw the rectangle and name on the frame
-                (top, right, bottom, left) = face_location
-                color = (0, 255, 0) if confidence > 0.4 else (0, 0, 255)
-                cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-                label = f"{name} ({confidence:.2f})"
-                cv2.putText(frame, label, (left, top-10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+            # Draw the rectangle and name on the frame
+            (top, right, bottom, left) = face_location
+            color = (0, 255, 0) if confidence > 0.4 else (0, 0, 255)
+            cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+            label = f"{name} ({confidence:.2f})"
+            cv2.putText(frame, label, (left, top-10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
     # Display the frame
     cv2.imshow('Face Recognition', frame)

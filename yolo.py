@@ -1,12 +1,25 @@
-import face_recognition
 import cv2
 import numpy as np
-from ultralytics import YOLO
 import os
-import numpy as np
+import torch
+from torchvision import transforms
+from facenet_pytorch import InceptionResnetV1
+from ultralytics import YOLO
 from sklearn.metrics.pairwise import cosine_similarity
+
 # Initialize YOLO model for fast detection
 yolo_model = YOLO("pretrain/yolo11-face-custom.pt")
+
+# Load VGGFace model
+vggface_model = InceptionResnetV1(pretrained='vggface2').eval()
+
+# Define a transformation to preprocess the images
+preprocess = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.Resize((160, 160)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+])
 
 # Load known faces
 known_faces = []
@@ -15,20 +28,71 @@ db_path = "db"
 
 print("Loading face database...")
 for filename in os.listdir(db_path):
-    if filename.endswith(('.jpg', '.jpeg', '.png')):
-        # Load image and compute encoding
+    if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+        # Load image
         image_path = os.path.join(db_path, filename)
-        image = face_recognition.load_image_file(image_path)
-        encoding = face_recognition.face_encodings(image)[0]
-        
-        # Store encoding and name
-        known_faces.append(encoding)
-        known_names.append(os.path.splitext(filename)[0])
+        image = cv2.imread(image_path)
+        if image is None:
+            print(f"Failed to load image: {image_path}")
+            continue
+
+        # Detect faces in the image using YOLO
+        results = yolo_model(image)
+
+        # Process detections
+        face_found = False
+        for r in results:
+            boxes = r.boxes
+            if len(boxes) == 0:
+                continue  # No detections in this result
+
+            for box in boxes:
+                if box.conf[0] < 0.5:
+                    continue  # Skip low-confidence detections
+
+                # Get coordinates from YOLO (x1, y1, x2, y2)
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+                # Ensure coordinates are within image bounds
+                h, w = image.shape[:2]
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(w, x2)
+                y2 = min(h, y2)
+
+                # Crop the face from the image
+                face_image = image[y1:y2, x1:x2]
+                if face_image.size == 0:
+                    print(f"Failed to crop face in image: {image_path}")
+                    continue
+
+                # Convert to RGB
+                face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+
+                # Preprocess the face image
+                face_tensor = preprocess(face_image_rgb).unsqueeze(0)
+
+                # Get the encoding
+                with torch.no_grad():
+                    encoding = vggface_model(face_tensor).numpy()[0]
+
+                # Store encoding and name
+                known_faces.append(encoding)
+                known_names.append(os.path.splitext(filename)[0])
+
+                face_found = True
+                break  # Process only the first detected face
+
+            if face_found:
+                break  # Exit if face is found
+
+        if not face_found:
+            print(f"No faces found in image: {image_path}")
 
 print(f"Loaded {len(known_names)} faces")
 
 # Initialize webcam
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 cap.set(3, 640)
 cap.set(4, 480)
 
@@ -54,30 +118,34 @@ while True:
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             
             # Convert YOLO box format (x1, y1, x2, y2) to face_recognition format (top, right, bottom, left)
-            # This is where the main change is: the correct format is [top, right, bottom, left]
             face_locations.append((y1, x2, y2, x1))  # (top, right, bottom, left)
 
     # Only process if faces are detected
     if face_locations:
-        # Convert the frame to RGB format (face_recognition uses RGB)
+        # Convert the frame to RGB format (VGGFace uses RGB)
         rgb_frame = np.ascontiguousarray(frame[:, :, ::-1])  # Convert BGR to RGB
 
         # Get face encodings
-        face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+        face_encodings = []
+        for (top, right, bottom, left) in face_locations:
+            face_image = rgb_frame[top:bottom, left:right]
+            face_tensor = preprocess(face_image).unsqueeze(0)
+            
+            with torch.no_grad():
+                encoding = vggface_model(face_tensor).numpy()[0]
+            
+            face_encodings.append(encoding)
 
         # Loop through all the detected faces and compare with known faces
         for face_encoding, face_location in zip(face_encodings, face_locations):
             # Compare with known faces
-            matches = face_recognition.compare_faces(known_faces, face_encoding, tolerance=0.6)
-            # face_distances = face_recognition.face_distance(known_faces, face_encoding)
-            # Compute cosine similarities
             cosine_similarities = cosine_similarity([face_encoding], known_faces)[0]
 
             # Find the index of the best match
             best_match_index = np.argmax(cosine_similarities)
 
             # Set a threshold for cosine similarity
-            threshold = 0.9  # Adjust this value based on your requirements
+            threshold = 0.8  # Adjust this value based on your requirements
 
             # Get the best similarity score
             best_similarity = cosine_similarities[best_match_index]
@@ -92,9 +160,9 @@ while True:
         
             # Draw the rectangle and name on the frame
             (top, right, bottom, left) = face_location
-            color = (0, 255, 0) if confidence > 0.4 else (0, 0, 255)
+            color = (0, 255, 0) if best_similarity > 0.4 else (0, 0, 255)
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-            label = f"{name} ({confidence:.2f})"
+            label = f"{name} ({best_similarity:.2f})"
             cv2.putText(frame, label, (left, top-10), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 

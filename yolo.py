@@ -5,7 +5,7 @@ import torch
 from torchvision import transforms
 from facenet_pytorch import InceptionResnetV1
 from ultralytics import YOLO
-from sklearn.metrics.pairwise import cosine_similarity
+import torch.nn.functional as F  # Import PyTorch functional API
 
 # Initialize YOLO model for fast detection
 yolo_model = YOLO("pretrain/yolo11-face-custom.pt")
@@ -74,7 +74,7 @@ for filename in os.listdir(db_path):
 
                 # Get the encoding
                 with torch.no_grad():
-                    encoding = vggface_model(face_tensor).numpy()[0]
+                    encoding = vggface_model(face_tensor)  # Keep as tensor
 
                 # Store encoding and name
                 known_faces.append(encoding)
@@ -92,7 +92,7 @@ for filename in os.listdir(db_path):
 print(f"Loaded {len(known_names)} faces")
 
 # Initialize webcam
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 cap.set(3, 640)
 cap.set(4, 480)
 
@@ -101,10 +101,10 @@ while True:
     ret, frame = cap.read()
     if not ret:
         break
-    
+
     # YOLO detection for face detection
     results = yolo_model(frame)
-    
+
     # Initialize the list for storing face locations
     face_locations = []
 
@@ -113,57 +113,61 @@ while True:
         for box in boxes:
             if box.conf[0] < 0.5:  # Ignore low-confidence detections
                 continue
-            
+
             # Get coordinates from YOLO (x1, y1, x2, y2)
             x1, y1, x2, y2 = map(int, box.xyxy[0])
-            
-            # Convert YOLO box format (x1, y1, x2, y2) to face_recognition format (top, right, bottom, left)
+
+            # Convert YOLO box format (x1, y1, x2, y2) to (top, right, bottom, left)
             face_locations.append((y1, x2, y2, x1))  # (top, right, bottom, left)
 
     # Only process if faces are detected
     if face_locations:
         # Convert the frame to RGB format (VGGFace uses RGB)
-        rgb_frame = np.ascontiguousarray(frame[:, :, ::-1])  # Convert BGR to RGB
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Get face encodings
         face_encodings = []
         for (top, right, bottom, left) in face_locations:
             face_image = rgb_frame[top:bottom, left:right]
             face_tensor = preprocess(face_image).unsqueeze(0)
-            
+
             with torch.no_grad():
-                encoding = vggface_model(face_tensor).numpy()[0]
-            
+                encoding = vggface_model(face_tensor)  # Keep as tensor
+
             face_encodings.append(encoding)
 
         # Loop through all the detected faces and compare with known faces
         for face_encoding, face_location in zip(face_encodings, face_locations):
-            # Compare with known faces
-            cosine_similarities = cosine_similarity([face_encoding], known_faces)[0]
+            # Compare with known faces using PyTorch cosine similarity
+            similarities = []
+            for known_face in known_faces:
+                # Compute cosine similarity
+                cosine_sim = F.cosine_similarity(face_encoding, known_face)
+                similarities.append(cosine_sim.item())
+
+            # Convert list to tensor for processing
+            similarities = torch.tensor(similarities)
 
             # Find the index of the best match
-            best_match_index = np.argmax(cosine_similarities)
+            best_match_index = torch.argmax(similarities).item()
 
             # Set a threshold for cosine similarity
             threshold = 0.8  # Adjust this value based on your requirements
 
             # Get the best similarity score
-            best_similarity = cosine_similarities[best_match_index]
+            best_similarity = similarities[best_match_index]
 
             if best_similarity > threshold:
                 name = known_names[best_match_index]
             else:
                 name = "Unknown"
 
-            # Set confidence as the best similarity score
-            confidence = best_similarity
-        
             # Draw the rectangle and name on the frame
             (top, right, bottom, left) = face_location
-            color = (0, 255, 0) if best_similarity > 0.4 else (0, 0, 255)
+            color = (0, 255, 0) if best_similarity > threshold else (0, 0, 255)
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
             label = f"{name} ({best_similarity:.2f})"
-            cv2.putText(frame, label, (left, top-10), 
+            cv2.putText(frame, label, (left, top - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
     # Display the frame
